@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ülker | Şifre Yönetim Sistemi</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- GÜVENLİK KÜTÜPHANESİ: CryptoJS (AES-256 Kriptolama için) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { ulker: { 50: '#fef2f2', 100: '#fee2e2', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 800: '#991b1b', 900: '#7f1d1d' } },
+                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { background-color: #f8fafc; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+        .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.4); }
+        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .toast-enter { transform: translateX(100%); opacity: 0; }
+        .toast-active { transform: translateX(0); opacity: 1; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .toast-leave { transform: translateX(100%); opacity: 0; transition: all 0.3s ease-in; }
+
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        
+        .toggle-checkbox:checked { right: 0; border-color: #10B981; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #10B981; }
+
+        .tab-btn.active { border-bottom: 2px solid #dc2626; color: #b91c1c; font-weight: 600; background: white; }
+    </style>
+</head>
+<body class="text-gray-800 antialiased min-h-screen flex flex-col relative">
+
+    <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none w-72 max-w-[90vw]"></div>
+
+    <!-- Modallar -->
+    <div id="confirmModal" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center fade-in p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center">
+            <div class="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">⚠️</div>
+            <h3 class="text-xl font-bold mb-2 text-gray-900" id="confirmTitle">Emin misiniz?</h3>
+            <p id="confirmMessage" class="text-gray-500 mb-6 text-sm">Bu işlem geri alınamaz.</p>
+            <div class="flex gap-3 justify-center">
+                <button onclick="closeConfirmModal()" class="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition-colors">İptal</button>
+                <button id="confirmBtn" class="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium shadow-lg shadow-red-200 transition-colors">Onayla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Yapımcı Footer -->
+    <div class="fixed bottom-3 right-3 z-50 group">
+        <div class="bg-white/80 backdrop-blur-md border border-gray-200 shadow-sm rounded-full px-3 py-1.5 text-[11px] text-gray-500 cursor-default flex items-center gap-1.5 transition-all duration-300 hover:shadow-md hover:bg-white">
+            <span class="opacity-70 group-hover:opacity-100">Yapımcı</span>
+            <span class="w-0 overflow-hidden whitespace-nowrap group-hover:w-[130px] transition-all duration-500 ease-in-out text-ulker-600 font-semibold tracking-wide">
+                | Okan Çelik'in katkılarıyla
+            </span>
+        </div>
+    </div>
+
+    <div id="view-login" class="flex-1 flex items-center justify-center p-4 min-h-screen relative overflow-hidden bg-gradient-to-br from-ulker-50 to-white">
+        <div class="absolute top-[-10%] left-[-10%] w-64 md:w-96 h-64 md:h-96 bg-ulker-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10"></div>
+        
+        <div class="glass-panel p-8 md:p-10 rounded-3xl shadow-xl w-full max-w-md text-center relative z-10 fade-in border border-white">
+            <div class="w-20 h-20 bg-gradient-to-tr from-ulker-100 to-ulker-50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner border border-ulker-100">
+                <span class="text-4xl">🏭</span>
+            </div>
+            <h2 class="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight mb-2">Sisteme Giriş</h2>
+            <p class="text-gray-500 text-sm mb-8">Devam etmek için şifrenizi girin.</p>
+            
+            <div class="space-y-4">
+                <input type="password" id="loginInput" class="w-full px-5 py-4 bg-gray-50/50 border border-gray-200 rounded-xl text-center text-xl font-bold outline-none focus:border-ulker-500 focus:bg-white transition-all placeholder-gray-300 tracking-widest" placeholder="••••" maxlength="15">
+                
+                <button onclick="attemptLogin()" class="w-full bg-ulker-600 hover:bg-ulker-700 text-white font-bold py-4 rounded-xl transition-all duration-200 shadow-lg shadow-ulker-200 active:scale-95 flex justify-center items-center gap-2">
+                    Giriş Yap <span class="text-xl">➔</span>
+                </button>
+            </div>
+
+            <!-- YENİ: Sistem Kurtarma Alanı -->
+            <div class="mt-8 pt-6 border-t border-gray-100">
+                <p class="text-xs text-gray-400 mb-2">Tarayıcı verileri sıfırlandıysa:</p>
+                <label class="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 rounded-lg text-xs font-medium transition-colors shadow-sm">
+                    <span class="text-ulker-600">📁</span> Sistemi Dosyadan Kurtar (.ulker)
+                    <input type="file" class="hidden" accept=".ulker" onchange="restoreDatabase(event)">
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-main" class="hidden flex-1 flex flex-col w-full fade-in relative min-h-screen">
+        <header class="bg-white shadow-sm sticky top-0 z-30">
+            <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-ulker-50 text-ulker-600 rounded-lg flex items-center justify-center text-xl font-bold shadow-sm">Ü</div>
+                    <div>
+                        <h1 class="text-lg font-bold text-gray-800 tracking-tight leading-tight">Şifre Arama Ağı</h1>
+                        <p class="text-[11px] text-gray-500 font-medium" id="welcomeUserText">Hoş geldin</p>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button id="navAdminBtn" onclick="switchView('view-admin')" class="hidden items-center gap-1.5 px-3 py-2 text-sm font-medium text-ulker-700 bg-ulker-50 hover:bg-ulker-100 rounded-lg transition-colors">
+                        <span class="hidden sm:inline">⚙️ Yönetim Paneli</span><span class="sm:hidden">⚙️</span>
+                    </button>
+                    <button onclick="logout()" class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                        🚪 <span class="hidden sm:inline">Çıkış</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="bg-gradient-to-b from-ulker-50/50 to-transparent pt-8 md:pt-12 pb-6 px-4">
+            <div class="max-w-3xl mx-auto text-center">
+                <h2 class="text-2xl md:text-4xl font-black text-gray-900 mb-6 tracking-tight">Aradığınız Şifreyi <span class="text-ulker-600">Hemen</span> Bulun.</h2>
+                
+                <div class="relative max-w-2xl mx-auto rounded-full bg-white shadow-lg shadow-gray-200/50 border border-gray-100 flex items-center p-1.5 transition-all duration-300 focus-within:ring-4 focus-within:ring-ulker-50 focus-within:border-ulker-300">
+                    <span class="pl-5 text-xl text-gray-400">🔍</span>
+                    <input type="text" id="searchBox" class="w-full py-3.5 px-4 text-base md:text-lg bg-transparent outline-none placeholder-gray-400" placeholder="Bölüm, Makine veya Tür adı yazın..." oninput="handleSearch()">
+                    <button id="clearSearchBtn" onclick="clearSearch()" class="hidden pr-5 p-2 text-gray-400 hover:text-ulker-600 transition-colors outline-none">
+                        <span class="text-2xl leading-none">&times;</span>
+                    </button>
+                </div>
+                <p class="mt-4 text-sm text-gray-500 font-medium" id="searchStats">Arama yapmaya hazırsınız.</p>
+            </div>
+        </div>
+
+        <div class="max-w-6xl mx-auto px-4 py-6 w-full flex-1">
+            <div id="resultsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"></div>
+        </div>
+    </div>
+
+    <div id="view-admin" class="hidden flex-1 flex flex-col w-full fade-in bg-slate-50 min-h-screen">
+        <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30">
+            <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">⚙️</span>
+                    <h1 class="text-lg md:text-xl font-bold tracking-wide">Yönetim Paneli</h1>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="switchView('view-main')" class="px-3 py-1.5 text-sm font-medium bg-slate-800 hover:bg-slate-700 rounded-md transition-colors border border-slate-700 flex items-center gap-2">
+                        <span>🔍</span> <span class="hidden sm:inline">Arama Sayfası</span>
+                    </button>
+                    <button onclick="logout()" class="px-3 py-1.5 text-sm font-medium bg-red-600 hover:bg-red-500 rounded-md transition-colors shadow-sm">Çıkış</button>
+                </div>
+            </div>
+            
+            <div class="bg-slate-100 flex px-4 pt-2 gap-1 overflow-x-auto hide-scroll border-b border-gray-200">
+                <button onclick="switchAdminTab('tab-passwords')" id="btn-tab-passwords" class="tab-btn active px-5 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 rounded-t-lg transition-colors whitespace-nowrap">🗄️ Şifre Veritabanı</button>
+                <button onclick="switchAdminTab('tab-users')" id="btn-tab-users" class="tab-btn px-5 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 rounded-t-lg transition-colors whitespace-nowrap">👥 Kullanıcılar & Yetkiler</button>
+            </div>
+        </header>
+
+        <div class="max-w-7xl mx-auto px-4 py-6 md:py-8 w-full">
+            
+            <div id="tab-passwords" class="space-y-6">
+                <!-- İstatistikler -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center text-lg hidden sm:flex">🔑</div>
+                        <div><p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Toplam Şifre</p><p id="statTotal" class="text-xl md:text-2xl font-bold text-gray-900">0</p></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-green-50 text-green-500 flex items-center justify-center text-lg hidden sm:flex">🏭</div>
+                        <div><p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Makineler</p><p id="statMachines" class="text-xl md:text-2xl font-bold text-gray-900">0</p></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center text-lg hidden sm:flex">👁️</div>
+                        <div><p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Görünür Şifre</p><p id="statVisible" class="text-xl md:text-2xl font-bold text-gray-900">0</p></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center text-lg hidden sm:flex">🔒</div>
+                        <div><p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Gizli Şifre</p><p id="statHidden" class="text-xl md:text-2xl font-bold text-gray-900">0</p></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+                    <!-- Sol: Şifre Ekleme -->
+                    <div class="space-y-6 lg:col-span-1">
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                            <h3 class="text-base font-bold text-gray-800 mb-4 border-b pb-2">➕ Tekli Şifre Kaydı</h3>
+                            <div class="space-y-3">
+                                <input type="text" id="addBolum" class="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-ulker-500" placeholder="Bölüm (Örn: Paketleme)" maxlength="50">
+                                <input type="text" id="addMakine" class="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-ulker-500" placeholder="Makine (Örn: Mikser)" maxlength="50">
+                                <div class="flex gap-2">
+                                    <input type="text" id="addTur" class="w-1/2 p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-ulker-500" placeholder="Tür (Örn: Operatör)" maxlength="30">
+                                    <input type="text" id="addSifre" class="w-1/2 p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-ulker-500 font-mono" placeholder="Şifre" maxlength="50">
+                                </div>
+                                <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer p-2 bg-gray-50 rounded-lg border border-gray-100">
+                                    <input type="checkbox" id="addGizli" class="w-4 h-4 text-ulker-600 rounded">
+                                    <span class="font-medium">Sadece Adminler Görebilir (Gizli)</span>
+                                </label>
+                                <button onclick="addSingleRecord()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-2.5 rounded-lg transition-colors text-sm">Sisteme Ekle</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sağ: Toplu Yükleme ve Tablo -->
+                    <div class="lg:col-span-2 space-y-6 flex flex-col">
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2 border-b pb-2">
+                                <h3 class="text-base font-bold text-gray-800">📊 Toplu Veri Yükleme</h3>
+                                <button onclick="downloadTemplate()" class="text-xs text-blue-600 hover:text-blue-800 font-medium underline flex items-center gap-1">📥 Şablon İndir</button>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">METİN KOPYALA / YAPIŞTIR</label>
+                                    <textarea id="bulkText" class="w-full h-24 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono outline-none focus:border-ulker-500 resize-none hide-scroll" placeholder="Excel/Word'den yapıştırın... (Bölüm | Makine | Tür | Şifre | Gizli(E/H))"></textarea>
+                                    <button onclick="processBulkText()" class="mt-2 w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 rounded-lg text-xs transition-colors border border-gray-300">İçeri Aktar</button>
+                                </div>
+                                <div class="flex flex-col justify-between">
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-500 mb-1">EXCEL SEÇ</label>
+                                        <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                                <span class="text-xl mb-1">📁</span>
+                                                <p class="text-xs text-gray-500"><span class="font-semibold text-ulker-600">Dosya Seç</span> veya Sürükle</p>
+                                            </div>
+                                            <input id="excelInput" type="file" class="hidden" accept=".xlsx, .xls, .csv" onchange="processExcelFile(event)" />
+                                        </label>
+                                    </div>
+                                    <div class="flex gap-2 mt-2">
+                                        <button onclick="exportToCSV()" class="w-1/2 flex items-center justify-center gap-1 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2 rounded-lg text-xs transition-colors" title="Düz metin Excel yedeği">
+                                            <span>📤</span> CSV İndir
+                                        </button>
+                                        <button onclick="exportDatabase()" class="w-1/2 flex items-center justify-center gap-1 bg-ulker-50 border border-ulker-200 hover:bg-ulker-100 text-ulker-700 font-bold py-2 rounded-lg text-xs transition-colors" title="Kriptolu Tam Sistem Yedeği">
+                                            <span>💾</span> Harddiske Kaydet
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Önizleme -->
+                        <div id="previewSection" class="hidden bg-yellow-50 p-5 rounded-xl shadow-sm border border-yellow-200">
+                            <h3 class="text-sm font-bold text-yellow-800 mb-2">👀 Aktarım Önizleme</h3>
+                            <p class="text-xs text-yellow-700 mb-4">Verileri kontrol edip düzenleyin. Onayladığınızda ana listeye eklenecektir.</p>
+                            <div class="overflow-x-auto bg-white rounded-lg border border-yellow-200 max-h-64">
+                                <table class="w-full text-left text-sm whitespace-nowrap">
+                                    <thead class="bg-yellow-100 text-yellow-800 text-xs uppercase sticky top-0">
+                                        <tr><th class="px-3 py-2">Bölüm</th><th class="px-3 py-2">Makine</th><th class="px-3 py-2">Tür</th><th class="px-3 py-2">Şifre</th><th class="px-3 py-2">Gizli</th><th class="px-3 py-2">Sil</th></tr>
+                                    </thead>
+                                    <tbody id="previewTableBody" class="divide-y divide-yellow-100"></tbody>
+                                </table>
+                            </div>
+                            <div class="flex gap-2 mt-4">
+                                <button onclick="savePreviewData()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg">✅ Onayla ve Kaydet</button>
+                                <button onclick="cancelPreview()" class="px-4 py-2 bg-gray-400 hover:bg-gray-500 text-white text-sm font-medium rounded-lg">İptal</button>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 flex-1 flex flex-col min-h-[400px]">
+                            <div class="p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between gap-3 bg-gray-50/50 rounded-t-xl">
+                                <h3 class="text-base font-bold text-gray-800">🗄️ Şifre Veritabanı</h3>
+                                <input type="text" id="adminSearch" oninput="renderAdminTable()" placeholder="Tabloda filtrele..." class="px-3 py-1.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-ulker-500 w-full sm:w-48 bg-white">
+                            </div>
+                            <div class="flex-1 overflow-x-auto">
+                                <table class="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
+                                    <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider sticky top-0 z-10 shadow-sm">
+                                        <tr>
+                                            <th class="px-4 py-3 font-medium">Bölüm</th>
+                                            <th class="px-4 py-3 font-medium">Makine</th>
+                                            <th class="px-4 py-3 font-medium">Tür</th>
+                                            <th class="px-4 py-3 font-medium">Şifre</th>
+                                            <th class="px-4 py-3 font-medium text-center">Gizlilik</th>
+                                            <th class="px-4 py-3 font-medium text-right">İşlem</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="adminTableBody" class="divide-y divide-gray-100 bg-white"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kullanıcılar Sekmesi -->
+            <div id="tab-users" class="hidden space-y-6">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-6 border-l-4 border-ulker-500">
+                    <h2 class="text-lg font-bold text-gray-900 mb-2">Kullanıcı Yönetimi ve Yetkilendirme</h2>
+                    <p class="text-sm text-gray-500">Sisteme sadece bu listedeki şifrelerle giriş yapılabilir. Kullanıcıların arama sayfasında neleri görebileceğini yetkilerle sınırlandırın.</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-1 bg-white p-5 rounded-xl shadow-sm border border-gray-100 h-fit">
+                        <h3 class="text-base font-bold text-gray-800 mb-4 border-b pb-2">👤 Yeni Kullanıcı Ekle</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Kullanıcı / Ekip Adı</label>
+                                <input type="text" id="uName" class="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-ulker-500" placeholder="Örn: Bakım Ekibi">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Giriş Şifresi (Benzersiz)</label>
+                                <input type="text" id="uPass" class="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-ulker-500 font-mono" placeholder="Örn: 5555">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Hesap Rolü</label>
+                                <select id="uRole" class="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-ulker-500" onchange="toggleAccessDiv()">
+                                    <option value="user">Standart Kullanıcı</option>
+                                    <option value="admin">Sistem Yöneticisi (Admin)</option>
+                                </select>
+                            </div>
+                            
+                            <div id="accessDiv" class="pt-2 border-t border-gray-100">
+                                <label class="block text-xs font-medium text-gray-500 mb-2">Görebileceği Bölümler (Yetki)</label>
+                                <div class="space-y-2 max-h-40 overflow-y-auto pr-2" id="departmentCheckboxes"></div>
+                            </div>
+                            
+                            <button onclick="addUser()" class="w-full bg-ulker-600 hover:bg-ulker-700 text-white font-medium py-2.5 rounded-lg transition-colors mt-4">Kullanıcı Oluştur</button>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+                        <div class="p-4 border-b border-gray-100 bg-gray-50/50">
+                            <h3 class="text-base font-bold text-gray-800">Kayıtlı Kullanıcılar</h3>
+                        </div>
+                        <div class="overflow-x-auto flex-1">
+                            <table class="w-full text-left text-sm whitespace-nowrap min-w-[500px]">
+                                <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                                    <tr>
+                                        <th class="px-4 py-3 font-medium">Kullanıcı Adı</th>
+                                        <th class="px-4 py-3 font-medium">Rol</th>
+                                        <th class="px-4 py-3 font-medium">Erişim İzni</th>
+                                        <th class="px-4 py-3 font-medium text-right">İşlem</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTableBody" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+<script>
+    // ==========================================
+    // 🛡️ DEVTOOLS & HACKER ENGELLEYİCİ
+    // ==========================================
+    document.addEventListener('contextmenu', event => event.preventDefault()); // Sağ tık engelle
+    document.onkeydown = function(e) {
+        if(e.keyCode == 123) { return false; } // F12
+        if(e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) { return false; } // Ctrl+Shift+I
+        if(e.ctrlKey && e.shiftKey && e.keyCode == 'C'.charCodeAt(0)) { return false; } // Ctrl+Shift+C
+        if(e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) { return false; } // Ctrl+Shift+J
+        if(e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) { return false; } // Ctrl+U (Kaynağı görüntüle)
+    };
+
+    // ==========================================
+    // 🔐 GÜVENLİK (Kriptolama Katmanı)
+    // ==========================================
+    const SECRET_KEY = "Ulk3r!F@ct0ry_2026#SecureL0ck"; // Sabit Kripto Anahtarı
+
+    function encryptData(text) {
+        if (!text) return "";
+        return CryptoJS.AES.encrypt(text, SECRET_KEY).toString();
+    }
+
+    function decryptData(cipherText) {
+        if (!cipherText) return "";
+        try {
+            const bytes = CryptoJS.AES.decrypt(cipherText, SECRET_KEY);
+            const originalText = bytes.toString(CryptoJS.enc.Utf8);
+            return originalText || cipherText; // Eğer çözülemezse (bozuksa) orijinali dön
+        } catch(e) {
+            return cipherText; // Zaten şifrelenmemişse düz dön (Geri dönük uyumluluk)
+        }
+    }
+
+    // Sistem Durumu (RAM Cache - Düz metin olarak durur, diske şifreli yazılır)
+    let appState = { records: [], users: [], currentUser: null, currentView: 'view-login' };
+    let searchDebounce = null;
+    let previewDataCache = [];
+
+    // GÜVENLİK: String temizleme (XSS)
+    const escapeStr = (str) => {
+        if (str == null) return '';
+        return String(str).replace(/[&<>"'`=\/]/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '`': '&#x60;', '=': '&#x3D;' }[s]));
+    };
+    const cleanStr = (str) => {
+        if (str == null) return '';
+        return String(str).replace(/[\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]/g, ' ').trim();
+    };
+    const generateId = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+
+    // UI YARDIMCILARI: Toast & Modal
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        const styles = { success: 'bg-white border-l-4 border-green-500 text-gray-800', error: 'bg-white border-l-4 border-red-500 text-gray-800', info: 'bg-white border-l-4 border-blue-500 text-gray-800' };
+        const icons = { success: '<span class="text-green-500 text-xl">✓</span>', error: '<span class="text-red-500 text-xl">✕</span>', info: '<span class="text-blue-500 text-xl">ℹ</span>' };
+        toast.className = `flex items-center gap-3 px-4 py-3 rounded-lg shadow-xl border toast-enter ${styles[type]}`;
+        toast.innerHTML = `${icons[type]}<span class="font-medium text-sm">${escapeStr(message)}</span>`;
+        container.appendChild(toast);
+        void toast.offsetWidth;
+        toast.classList.replace('toast-enter', 'toast-active');
+        setTimeout(() => { toast.classList.replace('toast-active', 'toast-leave'); setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    let confirmCallback = null;
+    function showConfirm(title, message, callback) {
+        document.getElementById('confirmTitle').innerText = title;
+        document.getElementById('confirmMessage').innerText = message;
+        confirmCallback = callback;
+        document.getElementById('confirmModal').classList.remove('hidden');
+    }
+    function closeConfirmModal() { document.getElementById('confirmModal').classList.add('hidden'); confirmCallback = null; }
+    document.getElementById('confirmBtn').addEventListener('click', () => { if(confirmCallback) confirmCallback(); closeConfirmModal(); });
+
+    // SİSTEM BAŞLATMA (Diskten Şifreli Veriyi Çözüp Okuma)
+    function initSystem() {
+        try {
+            // ŞİFRELERİ YÜKLE
+            const rawRecords = JSON.parse(localStorage.getItem('ulker_db_records') || '[]');
+            appState.records = rawRecords.map(r => {
+                let s = r.sifre;
+                if (s && s.startsWith('ENC:')) s = decryptData(s.substring(4));
+                return { ...r, sifre: s };
+            });
+            
+            // Veritabanı boşsa varsayılan
+            if (appState.records.length === 0) {
+                appState.records = [
+                    { id: generateId(), bolum: 'Üretim', makine: 'Karıştırıcı 1', tur: 'Operatör', sifre: '1234', isHidden: false },
+                    { id: generateId(), bolum: 'Paketleme', makine: 'Paket Makinesi A', tur: 'Genel', sifre: '5678', isHidden: false }
+                ];
+                saveRecords(); // İlk kayıtta kriptolar
+            }
+
+            // KULLANICILARI YÜKLE
+            let rawUsers = JSON.parse(localStorage.getItem('ulker_db_users'));
+            if (rawUsers) {
+                appState.users = rawUsers.map(u => {
+                    let p = u.pass;
+                    if (p && p.startsWith('ENC:')) p = decryptData(p.substring(4));
+                    return { ...u, pass: p };
+                });
+            } else {
+                appState.users = [
+                    { id: generateId(), name: 'Ortak Kullanıcı', pass: '1453', role: 'user', access: ['ALL'] },
+                    { id: generateId(), name: 'Sistem Yöneticisi', pass: '3486', role: 'admin', access: ['ALL'] }
+                ];
+                saveUsers(); // Kriptola
+            }
+        } catch (e) { console.error("Başlatma hatası", e); }
+
+        document.getElementById('loginInput').addEventListener('keyup', e => e.key === 'Enter' && attemptLogin());
+    }
+
+    // DİSKE YAZMA (Verileri Kriptolayarak Kaydetme)
+    function saveRecords() { 
+        const encrypted = appState.records.map(r => ({
+            ...r, sifre: r.sifre ? (r.sifre.startsWith('ENC:') ? r.sifre : 'ENC:' + encryptData(r.sifre)) : ''
+        }));
+        localStorage.setItem('ulker_db_records', JSON.stringify(encrypted)); 
+        updateAdminStats(); 
+    }
+    
+    function saveUsers() { 
+        const encrypted = appState.users.map(u => ({
+            ...u, pass: u.pass ? (u.pass.startsWith('ENC:') ? u.pass : 'ENC:' + encryptData(u.pass)) : ''
+        }));
+        localStorage.setItem('ulker_db_users', JSON.stringify(encrypted)); 
+    }
+
+    // EKRAN YÖNETİMİ
+    function switchView(viewId) {
+        ['view-login', 'view-main', 'view-admin'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        document.getElementById(viewId).classList.remove('hidden');
+        appState.currentView = viewId;
+        
+        if(viewId === 'view-main') {
+            document.getElementById('welcomeUserText').innerText = `Hoş geldin, ${appState.currentUser.name}`;
+            document.getElementById('navAdminBtn').style.display = appState.currentUser.role === 'admin' ? 'flex' : 'none';
+            document.getElementById('searchBox').focus();
+            handleSearch();
+        } else if (viewId === 'view-admin') {
+            renderAdminTable(); renderUsersTable(); renderDepartmentCheckboxes();
+        }
+    }
+
+    function switchAdminTab(tabId) {
+        ['tab-passwords', 'tab-users'].forEach(id => {
+            document.getElementById(id).classList.add('hidden');
+            document.getElementById('btn-' + id).classList.remove('active');
+        });
+        document.getElementById(tabId).classList.remove('hidden');
+        document.getElementById('btn-' + tabId).classList.add('active');
+    }
+
+    function attemptLogin() {
+        const input = document.getElementById('loginInput');
+        const pass = input.value.trim();
+        if(!pass) return;
+
+        const user = appState.users.find(u => u.pass === pass); // RAM'de şifreler düz metin, kıyaslama hızlı
+        
+        if (user) {
+            appState.currentUser = user;
+            input.value = '';
+            if(user.role === 'admin') { showToast(`Yönetici Girişi: ${user.name}`, "info"); switchView('view-admin'); } 
+            else { showToast(`Kullanıcı Girişi: ${user.name}`, "success"); switchView('view-main'); }
+        } else {
+            showToast("Geçersiz şifre!", "error");
+            input.value = ''; input.focus();
+        }
+    }
+
+    function logout() {
+        appState.currentUser = null; clearSearch();
+        document.getElementById('loginInput').value = '';
+        switchView('view-login'); showToast("Oturum kapatıldı", "info");
+    }
+
+    function handleSearch() {
+        clearTimeout(searchDebounce);
+        const inputObj = document.getElementById('searchBox');
+        const query = inputObj.value.trim().toLocaleLowerCase('tr-TR');
+        document.getElementById('clearSearchBtn').classList.toggle('hidden', inputObj.value.length === 0);
+
+        searchDebounce = setTimeout(() => {
+            const grid = document.getElementById('resultsGrid');
+            if(!appState.currentUser) return; 
+
+            // Yetkiye göre filtrele
+            let accessible = appState.records;
+            if (appState.currentUser.role !== 'admin') {
+                accessible = appState.records.filter(r => {
+                    if(r.isHidden) return false;
+                    if(appState.currentUser.access.includes('ALL')) return true;
+                    return appState.currentUser.access.some(dept => dept.toLowerCase() === r.bolum.toLowerCase());
+                });
+            }
+
+            if (query === '') { grid.innerHTML = ''; document.getElementById('searchStats').innerText = "Arama yapmaya hazırsınız."; return; }
+
+            const terms = query.split(' ').filter(t => t);
+            let results = accessible.filter(r => terms.every(t => `${r.bolum} ${r.makine} ${r.tur}`.toLocaleLowerCase('tr-TR').includes(t)));
+
+            if (results.length === 0) {
+                grid.innerHTML = `<div class="col-span-full py-10 text-center text-gray-400 bg-white rounded-2xl"><p>Yetkiniz dahilinde şifre yok.</p></div>`;
+                document.getElementById('searchStats').innerText = "Sonuç bulunamadı."; return;
+            }
+
+            document.getElementById('searchStats').innerHTML = `<span class="text-ulker-600 font-bold">${results.length}</span> sonuç bulundu.`;
+
+            const grouped = {};
+            results.slice(0, 100).forEach(r => {
+                const key = `${r.bolum}|${r.makine}`;
+                if(!grouped[key]) grouped[key] = { bolum: r.bolum, makine: r.makine, sifreler: [] };
+                grouped[key].sifreler.push({ tur: r.tur, sifre: r.sifre, isHidden: r.isHidden });
+            });
+
+            grid.innerHTML = Object.values(grouped).map(g => `
+                <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm relative overflow-hidden group">
+                    <div class="absolute top-0 left-0 w-1 h-full bg-ulker-500"></div>
+                    <div class="mb-4 pl-2">
+                        <h3 class="text-lg font-bold text-gray-900">${escapeStr(g.makine)}</h3>
+                        <p class="text-sm text-gray-500">${escapeStr(g.bolum)}</p>
+                    </div>
+                    ${g.sifreler.map(s => `
+                        <div class="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl mb-2 border">
+                            <div><div class="text-xs text-gray-500 font-medium">${escapeStr(s.tur)} ${s.isHidden ? '<span class="text-[10px] text-red-500 font-bold ml-1">(Gizli)</span>' : ''}</div>
+                            <div class="text-lg font-mono font-bold text-gray-900">${escapeStr(s.sifre)}</div></div>
+                            <button onclick="copyPass('${escapeStr(s.sifre.replace(/'/g, "\\'"))}', this)" class="p-2 text-gray-400 hover:text-ulker-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
+                        </div>
+                    `).join('')}
+                </div>`).join('');
+        }, 100);
+    }
+
+    function clearSearch() { document.getElementById('searchBox').value = ''; handleSearch(); document.getElementById('searchBox').focus(); }
+
+    function copyPass(text, btn) {
+        const fallback = (v) => { const t = document.createElement("textarea"); t.value = v; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); };
+        if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => fallback(text)); else fallback(text);
+        const orig = btn.innerHTML; btn.innerHTML = `<span class="text-green-500 text-sm font-bold">Kopyalandı!</span>`;
+        setTimeout(() => btn.innerHTML = orig, 1500); showToast("Kopyalandı", "success");
+    }
+
+    // ADMIN FONKSİYONLARI (CSV Export - Plaintext, DB'den çözer basar)
+    function updateAdminStats() {
+        document.getElementById('statTotal').innerText = appState.records.length;
+        document.getElementById('statMachines').innerText = new Set(appState.records.map(r => r.makine.toLowerCase())).size;
+        document.getElementById('statVisible').innerText = appState.records.filter(r => !r.isHidden).length;
+        document.getElementById('statHidden').innerText = appState.records.filter(r => r.isHidden).length;
+    }
+
+    function renderAdminTable() {
+        const tbody = document.getElementById('adminTableBody');
+        const filter = document.getElementById('adminSearch').value.toLocaleLowerCase('tr-TR').trim();
+        let data = appState.records;
+        if(filter) data = data.filter(r => `${r.bolum} ${r.makine} ${r.tur} ${r.sifre}`.toLocaleLowerCase('tr-TR').includes(filter));
+        
+        tbody.innerHTML = data.map(r => `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3">${escapeStr(r.bolum)}</td>
+                <td class="px-4 py-3 font-medium">${escapeStr(r.makine)}</td>
+                <td class="px-4 py-3"><span class="px-2 bg-gray-100 rounded text-xs">${escapeStr(r.tur)}</span></td>
+                <td class="px-4 py-3 font-mono">${escapeStr(r.sifre)}</td>
+                <td class="px-4 py-3 text-center"><input type="checkbox" onchange="toggleVisibility('${r.id}', this.checked)" ${r.isHidden?'checked':''} class="w-4 h-4 text-ulker-600 rounded"></td>
+                <td class="px-4 py-3 text-right"><button onclick="requestDeleteRecord('${r.id}')" class="text-red-500 hover:text-red-700 text-xs font-medium">Sil</button></td>
+            </tr>`).join('');
+    }
+
+    function toggleVisibility(id, isHidden) {
+        const r = appState.records.find(r => r.id === id);
+        if(r) { r.isHidden = isHidden; saveRecords(); showToast("Durum güncellendi", "info"); }
+    }
+
+    function addSingleRecord() {
+        const bolum = cleanStr(document.getElementById('addBolum').value);
+        const makine = cleanStr(document.getElementById('addMakine').value);
+        const tur = cleanStr(document.getElementById('addTur').value) || 'Genel';
+        const sifre = cleanStr(document.getElementById('addSifre').value);
+        const isHidden = document.getElementById('addGizli').checked;
+        if (!bolum || !makine || !sifre) return showToast("Bölüm, Makine ve Şifre zorunlu!", "error");
+        
+        appState.records.unshift({ id: generateId(), bolum, makine, tur, sifre, isHidden });
+        saveRecords(); showToast("Şifre eklendi", "success"); renderAdminTable(); renderDepartmentCheckboxes();
+        ['addBolum', 'addMakine', 'addTur', 'addSifre'].forEach(id => document.getElementById(id).value = '');
+    }
+
+    function requestDeleteRecord(id) { showConfirm("Silinecek", "Kalıcı olarak silinsin mi?", () => { appState.records = appState.records.filter(r => r.id !== id); saveRecords(); renderAdminTable(); renderDepartmentCheckboxes(); showToast("Silindi", "success"); }); }
+
+    function downloadTemplate() {
+        const content = "\uFEFFBölüm;Makine;Tür;Şifre;Gizli(E/H)\nÖrnek Paketleme;Koli Makinesi;Operatör;1234;H";
+        const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([content], {type: 'text/csv;charset=utf-8;'})); link.download = "sablon.csv"; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
+
+    function exportToCSV() {
+        if(appState.records.length === 0) return showToast("Veri yok!", "error");
+        let content = "\uFEFFBölüm;Makine;Tür;Şifre;Gizli(E/H)\n";
+        appState.records.forEach(r => { 
+            let row = [r.bolum, r.makine, r.tur, r.sifre, r.isHidden ? 'E' : 'H'].map(v => { let s = String(v); return s.includes(';') || s.includes('\n') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s; }); 
+            content += row.join(";") + "\n"; 
+        });
+        const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([content], {type: 'text/csv;charset=utf-8;'})); link.download = "Ulker_Excel_Yedek.csv"; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
+
+    // YENİ: TAM SİSTEM YEDEKLEME VE KURTARMA (AES KRİPTOLU)
+    function exportDatabase() {
+        const data = { records: appState.records, users: appState.users };
+        // Tüm veritabanını AES-256 ile kriptola
+        const encryptedData = CryptoJS.AES.encrypt(JSON.stringify(data), SECRET_KEY).toString();
+        
+        const blob = new Blob([encryptedData], {type: "text/plain;charset=utf-8"});
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        
+        const date = new Date().toISOString().split('T')[0];
+        link.download = `Ulker_Sistem_Yedek_${date}.ulker`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast("Tüm sistem bilgisayara şifreli olarak kaydedildi!", "success");
+    }
+
+    function restoreDatabase(e) {
+        const file = e.target.files[0];
+        if(!file) return;
+        e.target.value = ''; // Aynı dosyayı tekrar seçebilmek için inputu sıfırla
+        
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            try {
+                const encryptedText = evt.target.result;
+                // Şifreyi çöz
+                const bytes = CryptoJS.AES.decrypt(encryptedText, SECRET_KEY);
+                const decryptedText = bytes.toString(CryptoJS.enc.Utf8);
+                
+                if (!decryptedText) throw new Error("Şifre çözülemedi, anahtar uyuşmazlığı.");
+                
+                const data = JSON.parse(decryptedText);
+                if(data.records && data.users) {
+                    appState.records = data.records;
+                    appState.users = data.users;
+                    saveRecords(); // LocalStorage'a kaydet
+                    saveUsers();   // LocalStorage'a kaydet
+                    showToast("Sistem başarıyla kurtarıldı! Yeniden başlatılıyor...", "success");
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    showToast("Dosya formatı hatalı veya eksik veri!", "error");
+                }
+            } catch(err) {
+                console.error(err);
+                showToast("Geçersiz veya bozuk yedek dosyası!", "error");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // TOPLU VERİ İŞLEMLERİ (ÖNİZLEME)
+    function parseDataLine(parts) {
+        parts = parts.map(p => cleanStr(p));
+        if (parts.length >= 3) {
+            let bolum = parts[0], makine = parts[1], tur = parts.length >= 4 && parts[3] ? parts[2] : 'Genel';
+            let sifre = parts.length >= 4 && parts[3] ? String(parts[3]) : String(parts[2]);
+            let isHidden = parts.length >= 5 ? (parts[4].toLowerCase() === 'e' || parts[4] === '1') : false;
+            if(bolum && makine && sifre) return { bolum, makine, tur, sifre, isHidden };
+        } return null;
+    }
+
+    function processBulkText() {
+        const data = document.getElementById('bulkText').value.trim();
+        if (!data) return showToast("Metin kutusu boş", "error");
+        previewDataCache = data.split('\n').map(line => parseDataLine(line.split(/[\t;,]/))).filter(r => r);
+        if(previewDataCache.length > 0) openPreview(); else showToast("Format hatalı", "error");
+    }
+
+    function processExcelFile(e) {
+        const file = e.target.files[0]; if(!file) return; e.target.value = '';
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            const data = new Uint8Array(evt.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1});
+            previewDataCache = json.slice(1).map(row => parseDataLine(row)).filter(r => r);
+            if(previewDataCache.length > 0) openPreview(); else showToast("Veri bulunamadı", "error");
+        }; reader.readAsArrayBuffer(file);
+    }
+
+    function openPreview() {
+        document.getElementById('previewSection').classList.remove('hidden');
+        document.getElementById('previewTableBody').innerHTML = previewDataCache.map((r,i) => `
+            <tr><td class="px-2 py-1"><input class="w-full border p-1" value="${escapeStr(r.bolum)}" onchange="previewDataCache[${i}].bolum=this.value"></td>
+            <td class="px-2 py-1"><input class="w-full border p-1" value="${escapeStr(r.makine)}" onchange="previewDataCache[${i}].makine=this.value"></td>
+            <td class="px-2 py-1"><input class="w-full border p-1" value="${escapeStr(r.tur)}" onchange="previewDataCache[${i}].tur=this.value"></td>
+            <td class="px-2 py-1"><input class="w-full border p-1" value="${escapeStr(r.sifre)}" onchange="previewDataCache[${i}].sifre=this.value"></td>
+            <td class="px-2 py-1 text-center"><input type="checkbox" onchange="previewDataCache[${i}].isHidden=this.checked" ${r.isHidden?'checked':''}></td>
+            <td class="px-2 py-1"><button onclick="previewDataCache.splice(${i},1); openPreview();" class="text-red-500">Sil</button></td></tr>
+        `).join('');
+    }
+    function cancelPreview() { previewDataCache = []; document.getElementById('previewSection').classList.add('hidden'); }
+    
+    function savePreviewData() {
+        let added = 0;
+        previewDataCache.forEach(r => {
+            if(r.bolum && r.makine && r.sifre) {
+                const exists = appState.records.some(ex => ex.bolum===r.bolum && ex.makine===r.makine && ex.tur===r.tur && ex.sifre===r.sifre);
+                if(!exists) { appState.records.push({ id: generateId(), ...r }); added++; }
+            }
+        });
+        saveRecords(); renderAdminTable(); renderDepartmentCheckboxes(); cancelPreview();
+        showToast(`${added} şifre eklendi.`, "success");
+    }
+
+    // KULLANICI İŞLEMLERİ
+    function toggleAccessDiv() { document.getElementById('accessDiv').style.display = document.getElementById('uRole').value === 'user' ? 'block' : 'none'; }
+    function renderDepartmentCheckboxes() {
+        const depts = [...new Set(appState.records.map(r => r.bolum.trim()))].sort();
+        document.getElementById('departmentCheckboxes').innerHTML = `<label class="flex items-center gap-2"><input type="checkbox" id="chkDept_ALL" value="ALL" onchange="document.querySelectorAll('.dept-checkbox').forEach(c=>c.disabled=this.checked)"> <span class="font-bold">Tüm Bölümler</span></label>` + 
+            depts.map(d => d ? `<label class="flex items-center gap-2 pl-4"><input type="checkbox" class="dept-checkbox" value="${escapeStr(d)}"> <span>${escapeStr(d)}</span></label>` : '').join('');
+    }
+    function renderUsersTable() {
+        document.getElementById('usersTableBody').innerHTML = appState.users.map(u => `
+            <tr class="hover:bg-gray-50"><td class="px-4 py-3">${escapeStr(u.name)}</td><td class="px-4 py-3">${u.role==='admin'?'<span class="text-red-600 font-bold">Admin</span>':'Kullanıcı'}</td>
+            <td class="px-4 py-3 text-xs truncate max-w-[200px]">${u.role==='admin' ? 'Tümü' : u.access.join(', ')}</td>
+            <td class="px-4 py-3 text-right">${appState.users.length>1?`<button onclick="requestDeleteUser('${u.id}')" class="text-red-500">Sil</button>`:'-'}</td></tr>
+        `).join('');
+    }
+
+    function addUser() {
+        const name = cleanStr(document.getElementById('uName').value), pass = cleanStr(document.getElementById('uPass').value), role = document.getElementById('uRole').value;
+        if(!name || !pass) return showToast("Ad ve Şifre zorunlu!", "error");
+        if(appState.users.some(u => u.pass === pass)) return showToast("Şifre başka kullanıcıda var!", "error");
+        
+        let access = ['ALL'];
+        if(role === 'user' && !document.getElementById('chkDept_ALL').checked) {
+            access = Array.from(document.querySelectorAll('.dept-checkbox:checked')).map(c => c.value);
+            if(access.length === 0) return showToast("En az bir bölüm seçin!", "error");
+        }
+        appState.users.push({ id: generateId(), name, pass, role, access });
+        saveUsers(); showToast("Kullanıcı oluşturuldu", "success"); renderUsersTable();
+        document.getElementById('uName').value = ''; document.getElementById('uPass').value = '';
+    }
+
+    function requestDeleteUser(id) {
+        if(appState.users.length <= 1) return;
+        showConfirm("Kullanıcı Silinecek", "Emin misiniz?", () => { appState.users = appState.users.filter(u => u.id !== id); saveUsers(); renderUsersTable(); showToast("Kullanıcı silindi", "success"); });
+    }
+
+    window.onload = initSystem;
+</script>
+</body>
+</html>
